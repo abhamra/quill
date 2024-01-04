@@ -1,0 +1,108 @@
+//! This is the set of rules for Quill's parser
+// Program = _{ SOI ~ (Expr)* ~ EOF }
+Program = { SOI ~ (Stmt ~ NEWLINE*)* ~ EOI }
+// NOTE TO SELF: SHOULD THIS BE STMT INSTEAD OF EXPR?
+
+// Expr = { BinExpr | UnaryExpr | CompExpr }
+
+
+// Note: match expressions, not statements (because statements are built up out of expressions)
+// Also, statements are built out of nodes that contain expressions
+// Like, the return expression
+Stmt = _{ AssignStmt 
+        | GateStmt 
+        | MeasureStmt 
+        | ReturnStmt 
+        | COMMENT }
+// NOTE TO SELF: REORGANIZE BELOW SECTIONS INTO ORDER
+
+
+IfStmt = { "If " ~ QubitTarget ~ ", thou shalt let the following occur {" ~ WHITE_SPACE* ~ (Stmt ~ NEWLINE*)* ~ WHITE_SPACE* ~ "}" }
+
+
+// Return Statement
+ReturnStmt = { "Return " ~ Shots ~ (", " ~ OutputType)? }
+Shots = { (("0" ~ !ASCII_DIGIT) | (ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*)) }
+OutputType = { ("qir" | "qasm" | "qiskit") }
+
+AssignStmt = { RespectExpr ~ " " ~ "create " ~ 
+"oo " ~ Type ~ " " ~ Name ~ " with value " ~ Value }
+RespectExpr = { "Maistow" | "Canstow" }
+
+GateStmt = _{ MultiControlGateStmt | ToffoliGateStmt | DoubleParamGateStmt | DoubleGateStmt | SingleParamGateStmt | SingleGateStmt }
+
+SingleGateStmt = { "Thy " ~ Q1Gate ~ " shalt target " ~ QubitTarget }
+Q1Gate = { "h"
+		 | "x" 
+         | "y"
+         | "z"
+         | "sadj"
+         | "s"
+         | "tadj"
+         | "t" } // add more
+
+SingleParamGateStmt = { "Thy " ~ Q1ParamGate ~ " shalt target " ~ QubitTarget ~ " with " ~ ValList }
+Q1ParamGate = { "rx"
+			  | "ry"
+              | "rz" 
+              | "u3" }
+
+DoubleGateStmt = { "Thy " ~ Q2Gate ~ " shalt target " ~ QubitTarget ~ " and control on " ~ QubitTarget }
+Q2Gate = { "cnot"
+		 | "swap" 
+         | "cx"
+         | "cz" } 
+         /// add more
+         
+DoubleParamGateStmt = { "Thy " ~ Q2ParamGate ~ " shalt target " ~ QubitTarget ~ " and control on " ~ QubitTarget ~ " with " ~ ValList }
+Q2ParamGate = { "rxx"
+              | "ryy" 
+              | "rzz" }
+
+ToffoliGateStmt = { "Thy " ~ ("toffoli" | "ccx") ~ " shalt target " ~ (QubitTarget ~ ", "?){2} ~ " and control on " ~ QubitTarget }
+
+MultiControlGateStmt = { "Thy " ~ QMultiGate ~ " shalt target " ~ (((QubitTarget ~ ", "?){2,}) | QRegSlice ) ~ " and control on " ~ QubitTarget }
+QMultiGate = { "mcx" 
+			 | "mcy"
+             | "mcz" }
+
+MeasureStmt = { "Rede " ~ QubitTarget ~ " and quyken " ~ CBitTarget }
+
+Type = {  "qubit" 
+		| "qreg" 
+        | "int" 
+        | "float" 
+        | "cbit" 
+        | "bool" 
+        | "creg" }
+
+
+// Rules for all values
+/// A value can hold any of these types
+Value = { QReg | CReg | Float | CBit | Qubit | Int | PI }
+ValList = { "[" ~ (Value ~ ", "?)+ ~ "]" }
+
+PI = _{ "PI" ~ ("[" ~ (Int ~ ", "?)+ ~ "]")? }
+QubitTarget = _{ (QRegSlice | Name) }
+CBitTarget = _{ (CRegSlice | Name) }
+
+QReg = _{ (Qubit ~ "[" ~ (Index | Name) ~ "]") ~ (" + " ~ QReg)? }
+QRegSlice = { (Name ~ "[" ~ Index ~ ".." ~ Index ~ "]") | (Name ~ "[" ~ Index ~ "]") }
+// Notes: Here we are using qname to mean the name of the qreg itself
+// The QRegSlice should support qname[i] for a single qubit, 
+// or qname[i..j] for a range of qubits, where i < j
+Index = { (("0" ~ !ASCII_DIGIT) | (ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*)) }
+Qubit = _{ ("0" | "1" | "+" | "-") ~ !Qubit }
+Int = _{ "-"? ~ (("0" ~ !ASCII_DIGIT) | (ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*)) } 
+Float = _{ "-"? ~ (("0" ~ !ASCII_DIGIT) | (ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*)) ~ "." ~ ASCII_DIGIT+ }
+// NOTE TO SELF: For now, we just need to parse all valid values, and
+// we don't need to classify them / verify their accuracy
+// that is the job of the type checker
+CBit = _{ ("0" | "1") ~ !CBit }
+CReg = _{ (("0" | "1") ~ "[" ~ (Int | Name) ~ "]") ~ (" + " ~ CReg)? }
+CRegSlice = { (Name ~ "[" ~ Index ~ ".." ~ Index ~ "]") | (Name ~ "[" ~ Index ~ "]") }
+
+// NOTE TO SELF -> TRY TO FIGURE OUT STATEMENTS VS EXPRESSIONS
+Name = { ASCII_ALPHA ~ ASCII_ALPHANUMERIC* }
+COMMENT = _{ "//" ~ (!NEWLINE ~ ANY)* ~ NEWLINE+ }
+

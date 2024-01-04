@@ -1,0 +1,18 @@
+Thy h shalt target q1
+Thy x shalt target q1
+Thy y shalt target q1
+Thy z shalt target q1
+Thy sadj shalt target q1
+Thy s shalt target q1
+Thy t shalt target q1
+Thy tadj shalt target q1
+Thy rx shalt target q1 with [3.14]
+Thy ry shalt target q1 with [3.14]
+Thy rz shalt target q1 with [3.14]
+Thy u3 shalt target q1 with [3.14, 3.14, PI]
+Thy rx shalt target q1 with [PI[3], PI, PI[3, 4]]
+Thy cx shalt target q1 and control on q2
+Thy swap shalt target q1 and control on q2
+Thy rxx shalt target q1 and control on q2 with [PI]
+Thy ccx shalt target q1, q2 and control on q3
+Thy mcx shalt target q1, q2, q3 and control on q4
