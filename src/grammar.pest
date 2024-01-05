@@ -1,36 +1,21 @@
 //! This is the set of rules for Quill's parser
-// Program = _{ SOI ~ (Expr)* ~ EOF }
 Program = { SOI ~ (Stmt ~ NEWLINE*)* ~ EOI }
-// NOTE TO SELF: SHOULD THIS BE STMT INSTEAD OF EXPR?
 
-// Expr = { BinExpr | UnaryExpr | CompExpr }
-
-
-// Note: match expressions, not statements (because statements are built up out of expressions)
-// Also, statements are built out of nodes that contain expressions
-// Like, the return expression
 Stmt = _{ AssignStmt 
         | GateStmt 
         | MeasureStmt 
         | ReturnStmt 
         | COMMENT }
-// NOTE TO SELF: REORGANIZE BELOW SECTIONS INTO ORDER
 
-
-IfStmt = { "If " ~ QubitTarget ~ ", thou shalt let the following occur {" ~ WHITE_SPACE* ~ (Stmt ~ NEWLINE*)* ~ WHITE_SPACE* ~ "}" }
-
-
-// Return Statement
-ReturnStmt = { "Return " ~ Shots ~ (", " ~ OutputType)? }
-Shots = { (("0" ~ !ASCII_DIGIT) | (ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*)) }
-OutputType = { ("qir" | "qasm" | "qiskit") }
-
+// Assignment Statement
 AssignStmt = { RespectExpr ~ " " ~ "create " ~ 
 "oo " ~ Type ~ " " ~ Name ~ " with value " ~ Value }
 RespectExpr = { "Maistow" | "Canstow" }
 
+// Gate Application Statement
 GateStmt = _{ MultiControlGateStmt | ToffoliGateStmt | DoubleParamGateStmt | DoubleGateStmt | SingleParamGateStmt | SingleGateStmt }
 
+// Single Gate Application
 SingleGateStmt = { "Thy " ~ Q1Gate ~ " shalt target " ~ QubitTarget }
 Q1Gate = { "h"
 		 | "x" 
@@ -39,41 +24,50 @@ Q1Gate = { "h"
          | "sadj"
          | "s"
          | "tadj"
-         | "t" } // add more
+         | "t" }
 
+// Single Parameterized Gate Application
 SingleParamGateStmt = { "Thy " ~ Q1ParamGate ~ " shalt target " ~ QubitTarget ~ " with " ~ ValList }
 Q1ParamGate = { "rx"
 			  | "ry"
               | "rz" 
               | "u3" }
 
+// Double Gate Application
 DoubleGateStmt = { "Thy " ~ Q2Gate ~ " shalt target " ~ QubitTarget ~ " and control on " ~ QubitTarget }
 Q2Gate = { "cnot"
 		 | "swap" 
          | "cx"
          | "cz" } 
-         /// add more
-         
+
+// Double Parameterized Gate Application
 DoubleParamGateStmt = { "Thy " ~ Q2ParamGate ~ " shalt target " ~ QubitTarget ~ " and control on " ~ QubitTarget ~ " with " ~ ValList }
 Q2ParamGate = { "rxx"
               | "ryy" 
               | "rzz" }
 
+// Toffoli Gate Application
 ToffoliGateStmt = { "Thy " ~ ("toffoli" | "ccx") ~ " shalt target " ~ (QubitTarget ~ ", "?){2} ~ " and control on " ~ QubitTarget }
 
+// Multi-Controlled Gate Application
 MultiControlGateStmt = { "Thy " ~ QMultiGate ~ " shalt target " ~ (((QubitTarget ~ ", "?){2,}) | QRegSlice ) ~ " and control on " ~ QubitTarget }
 QMultiGate = { "mcx" 
 			 | "mcy"
              | "mcz" }
 
+// Measurement (from qubit to a classical bit) Statement
 MeasureStmt = { "Rede " ~ QubitTarget ~ " and quyken " ~ CBitTarget }
 
+// Return Statement
+ReturnStmt = { "Return " ~ Index ~ (", " ~ OutputType)? }
+OutputType = { ("qir" | "qasm" | "qiskit") }
+
+// All currently supported types in Quill
 Type = {  "qubit" 
 		| "qreg" 
         | "int" 
         | "float" 
         | "cbit" 
-        | "bool" 
         | "creg" }
 
 
@@ -82,27 +76,48 @@ Type = {  "qubit"
 Value = { QReg | CReg | Float | CBit | Qubit | Int | PI }
 ValList = { "[" ~ (Value ~ ", "?)+ ~ "]" }
 
-PI = _{ "PI" ~ ("[" ~ (Int ~ ", "?)+ ~ "]")? }
+// A keyword to support PI, which we want as an inherent feature of
+// our language. We support PI, PI[i], and PI[i, j], where the latter
+// two statements mean PI * i and PI * (i / j) respectively
+PI = _{ "PI" ~ ("[" ~ (Int ~ ", "?){,2} ~ "]")? }
+
+// These "target" rules aim to simplify the process of working with 
+// either a name (a variable) or a qreg / creg slice (an individual
+// qubit or cbit)
 QubitTarget = _{ (QRegSlice | Name) }
 CBitTarget = _{ (CRegSlice | Name) }
 
+// The QReg value, largely for instantiation purposes. The QRegSlice is
+// more commonly used for accessing individual qubits or a range of qubits
+// for gate applications
 QReg = _{ (Qubit ~ "[" ~ (Index | Name) ~ "]") ~ (" + " ~ QReg)? }
 QRegSlice = { (Name ~ "[" ~ Index ~ ".." ~ Index ~ "]") | (Name ~ "[" ~ Index ~ "]") }
-// Notes: Here we are using qname to mean the name of the qreg itself
-// The QRegSlice should support qname[i] for a single qubit, 
-// or qname[i..j] for a range of qubits, where i < j
+
+// The Index is meant to target non-negative values, and is a separate rule
+// largely because it isn't silenced
 Index = { (("0" ~ !ASCII_DIGIT) | (ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*)) }
+
+// The Qubit Type
 Qubit = _{ ("0" | "1" | "+" | "-") ~ !Qubit }
-Int = _{ "-"? ~ (("0" ~ !ASCII_DIGIT) | (ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*)) } 
-Float = _{ "-"? ~ (("0" ~ !ASCII_DIGIT) | (ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*)) ~ "." ~ ASCII_DIGIT+ }
-// NOTE TO SELF: For now, we just need to parse all valid values, and
-// we don't need to classify them / verify their accuracy
-// that is the job of the type checker
+
+// Integers
+Int = _{ "-"? ~ (("0" ~ !ASCII_DIGIT) | (ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*)) } // how do we handle 05, for example?
+
+// Floats
+Float = _{ Int ~ "." ~ ASCII_DIGIT+ }
+
+// Classical Bit (CBit) -> O or 1
 CBit = _{ ("0" | "1") ~ !CBit }
+
+// Classical Bit Register (similar to QReg implementation). CRegSlice
+// is for accessing single (or ranges of) bit(s), similar to QRegSlice
 CReg = _{ (("0" | "1") ~ "[" ~ (Int | Name) ~ "]") ~ (" + " ~ CReg)? }
 CRegSlice = { (Name ~ "[" ~ Index ~ ".." ~ Index ~ "]") | (Name ~ "[" ~ Index ~ "]") }
 
-// NOTE TO SELF -> TRY TO FIGURE OUT STATEMENTS VS EXPRESSIONS
+// Name is used to match all variables after all other rules (such as QRegSlices)
+// have been exhausted. Variables cannot start with a number, but are otherwise
+// given alphanumeric freedom
 Name = { ASCII_ALPHA ~ ASCII_ALPHANUMERIC* }
-COMMENT = _{ "//" ~ (!NEWLINE ~ ANY)* ~ NEWLINE+ }
 
+// Comment (self-explanatory)
+COMMENT = _{ "//" ~ (!NEWLINE ~ ANY)* ~ NEWLINE+ }
