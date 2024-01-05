@@ -49,4 +49,18 @@ On the docket for (potential) future additions to Quill are:
 - More potentially painful and perilous syntax (beware)
 
 ## Examples
+Below is a simple example of creating a Bell State using Quill:
+```
+// Comment Test: Example CNOT program in Quill
+Maistow create oo creg c1 with value 0
+Maistow create oo creg c2 with value 0
+Canstow create oo qubit q1 with value +
+Canstow create oo qubit q2 with value 0
+Thy cnot shalt target q2 and control on q1
+Rede q1 and quyken c1
+Rede q2 and quyken c2
+Return 1024, qir
+```
 
+## Full Documentation
+TBD
