@@ -35,8 +35,6 @@ The current features are:
 
 All of these will be demonstrated in the "Examples" section.
 
-Also note that the keywords "Canstow" and "Maistow" are important to consider, because if you don't use enough "Maistow"s for respect, you will lose out on optimizations! Make sure to keep the ratio of "Maistow" to total variable declarations above 50%! The ratio requirements may be subject to change :D
-
 ### Feature Roadmap:
 On the docket for (potential) future additions to Quill are:
 - If/elif/else statements
@@ -80,18 +78,46 @@ There are some interesting interactions with the `PI` construct, which is native
 
 _Ex_: `Canstow create oo qubit q1 with value 0`
 
+Also note that the keywords "Canstow" and "Maistow" are important to consider, because if you don't use enough "Maistow"s for respect, you will lose out on optimizations! Make sure to keep the ratio of "Maistow" to total variable declarations above 50%! The ratio requirements may be subject to change :D
+
 ### Gate Application:
 There are many different types of gates, and some slight nuances in how we use some types of gates; below are the details of all of these differences. Before we begin, most parameters to gate application statements are either the gate name or a variable, which can be of type Qubit or of type QRegSlice. What this means is that we can apply a gate to something like `qubit1` or something like `qreg1[i]`. In the case of single qubit gates, we can also apply them to `qreg[i..j]`, for example, which will apply a given gate to all of the selected qubits at once. QRegs are 0-indexed.
 
-*Single Qubit Gate*: Thy `gate_name` shalt target `variable`
-_Ex1_: `Thy x shalt target q1` (Applied to qubit `q1`)
-_Ex2_: `Thy y shalt target qreg1[2]` (Applied to qubit 2 in quantum register `qreg1`)
+**Single Qubit Gate**: Thy `gate_name` shalt target `variable`
+
+_Ex1_: `Thy x shalt target q1` (Applied to qubit `q1`)\
+_Ex2_: `Thy y shalt target qreg1[2]` (Applied to qubit 2 in quantum register `qreg1`)\
 _Ex3_: `Thy z shalt target qreg1[0..3]` (Applied to qubits 0 through 3, inclusive, in quantum register `qreg1`)
 
-*Single Qubit Parameterized Gate*: Thy `gate_name` shalt target `variable` with [`var1`, `var2`, ...]
+**Single Qubit Parameterized Gate**: Thy `gate_name` shalt target `variable` with [`var1`, `var2`, ...]
 _Note_: `var1`, `var2`, etc., are only valid when numerical values such as integers, floats, or the PI construct.
 
 _Ex_: `Thy u3 shalt target q1 with [1.2, 1, PI[2]]`
 
-*Double Qubit Gate*: Thy `gate_name` shalt target `variable1` and control on `variable2`
-_Ex_: `Thy `
+**Double Qubit Gate**: Thy `gate_name` shalt target `var1` and control on `var2`
+
+_Ex_: `Thy cnot shalt target q2 and control on q1`
+
+**Double Qubit Parameterized Gate**: Thy `gate_name` shalt target `var1` and control on `var2` with [`var3`, `var4`, ...]
+
+_Ex_: `Thy rxx shalt target q2 and control on q1 with [3.14, PI[2, 3]]`
+
+**Multi Control Gate**: Thy `gate_name` shalt target `var1` and control on `var2`, `var3`, ...
+
+_Ex_: `Thy toffoli shalt target q3 and control on q1, q2`
+
+### Measurement:
+Rede `var1` and quyken `var2`
+_Note_: Here, `var1` is either a Qubit or QRegSlice, and `var2` is either a CBit or CRegSlice.
+
+_Ex1_: `Rede q1 and quyken c1`\
+_Ex2_: `Rede qreg[1] and quyken creg[1]`\
+_Ex3_: `Rede qreg[0..3] and quyken creg[0..3]`
+
+### Returning:
+The goal of returning in Quill is to get a histogram-esque output based on a number of shots, as well as code based on one of three alternate output formats: Quantum Intermediate Representation (QIR), Quantum Assembly (QASM), and Qiskit.
+
+The expression terminates all Quill Programs, and looks like this: Return `num_shots`, `output_type`
+Here, `num_shots` is a positive integer and `output_type` is one of `qir`, `qasm`, and `qiskit`.
+
+This concludes the documentation!

@@ -47,10 +47,10 @@ Q2ParamGate = { "rxx"
               | "rzz" }
 
 // Toffoli Gate Application
-ToffoliGateStmt = { "Thy " ~ ("toffoli" | "ccx") ~ " shalt target " ~ (QubitTarget ~ ", "?){2} ~ " and control on " ~ QubitTarget }
+ToffoliGateStmt = { "Thy " ~ ("toffoli" | "ccx") ~ " shalt target " ~ QubitTarget ~ " and control on " ~ (QubitTarget ~ ", "?){2} }
 
 // Multi-Controlled Gate Application
-MultiControlGateStmt = { "Thy " ~ QMultiGate ~ " shalt target " ~ (((QubitTarget ~ ", "?){2,}) | QRegSlice ) ~ " and control on " ~ QubitTarget }
+MultiControlGateStmt = { "Thy " ~ QMultiGate ~ " shalt target " ~ (QubitTarget | QRegSlice ) ~ " and control on " ~ ((QubitTarget ~ ", "?){2,}) }
 QMultiGate = { "mcx" 
 			 | "mcy"
              | "mcz" }
