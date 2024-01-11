@@ -14,5 +14,6 @@ Thy rx shalt target q1 with [PI[3], PI, PI[3, 4]]
 Thy cx shalt target q1 and control on q2
 Thy swap shalt target q1 and control on q2
 Thy rxx shalt target q1 and control on q2 with [PI]
-Thy ccx shalt target q1, q2 and control on q3
-Thy mcx shalt target q1, q2, q3 and control on q4
+Thy toffoli shalt target q1 and control on q2, q3
+Thy ccx shalt target q1 and control on q2, q3
+Thy mcx shalt target q1 and control on q2, q3, q4
