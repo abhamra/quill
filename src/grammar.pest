@@ -1,7 +1,7 @@
 //! This is the set of rules for Quill's parser
 Program = _{ SOI ~ (Stmt ~ NEWLINE*)* ~ EOI }
 
-Stmt = { AssignStmt 
+Stmt = _{ AssignStmt 
         | GateStmt 
         | MeasureStmt 
         | ReturnStmt 
@@ -34,14 +34,14 @@ Q1ParamGate = { "rx"
               | "u3" }
 
 // Double Gate Application
-DoubleGateStmt = _{ "Thy " ~ Q2Gate ~ " shalt target " ~ QubitTarget ~ " and control on " ~ QubitTarget }
+DoubleGateStmt = _{ "Thy " ~ Q2Gate ~ " shalt target " ~ QubitTarget ~ " and control on " ~ ControlList }
 Q2Gate = { "cnot"
 		 | "swap" 
          | "cx"
          | "cz" } 
 
 // Double Parameterized Gate Application
-DoubleParamGateStmt = _{ "Thy " ~ Q2ParamGate ~ " shalt target " ~ QubitTarget ~ " and control on " ~ QubitTarget ~ " with " ~ ValList }
+DoubleParamGateStmt = _{ "Thy " ~ Q2ParamGate ~ " shalt target " ~ QubitTarget ~ " and control on " ~ ControlList ~ " with " ~ ValList }
 Q2ParamGate = { "rxx"
               | "ryy" 
               | "rzz" }
@@ -59,7 +59,7 @@ QMultiGate = { "mcx"
 MeasureStmt = { "Rede " ~ QubitTarget ~ " and quyken " ~ CBitTarget }
 
 // Return Statement
-ReturnStmt = { "Return " ~ Index ~ (", " ~ OutputType)? }
+ReturnStmt = { "Return " ~ Int ~ (", " ~ OutputType)? }
 OutputType = { ("qir" | "qasm" | "qiskit") }
 
 // All currently supported types in Quill
@@ -74,8 +74,8 @@ Type = _{  "qubit"
 
 // Idea: Value should be silenced, unsilence all children
 
-Value = _{ QRegTensor | QReg | CReg | Float | Int | CBit | Qubit | PI }
-ValList = { "[" ~ (Value ~ ", "?)+ ~ "]" }
+Value = _{ QRegTensor | QReg | CReg | Qubit | CBit | PI }
+ValList = { "[" ~ ((Value | Float | Int) ~ ", "?)+ ~ "]" }
 ControlList = { (QubitTarget ~ ", "?)+ }
 
 // A keyword to support PI, which we want as an inherent feature of
@@ -104,10 +104,10 @@ Index = { (("0" ~ !ASCII_DIGIT) | (ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*)) }
 Qubit = { ("0" | "1" | "+" | "-") ~ !Value }
 
 // Integers
-Int = { "-"? ~ (("0" ~ !ASCII_DIGIT) | (ASCII_NONZERO_DIGIT ~ ASCII_DIGIT?)) } // how do we handle 05, for example?
+Int = { "-"? ~ (("0" ~ !ASCII_DIGIT) | (ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*)) } // how do we handle 05, for example?
 
 // Floats
-Float = { "-"? ~ (("0" ~ !ASCII_DIGIT) | (ASCII_NONZERO_DIGIT ~ ASCII_DIGIT?)) ~ "." ~ ASCII_DIGIT+ }
+Float = { "-"? ~ (("0" ~ !ASCII_DIGIT) | (ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*)) ~ "." ~ ASCII_DIGIT+ }
 
 // Classical Bit (CBit) -> O or 1
 CBit = { ("b0" | "b1") ~ !CBit }

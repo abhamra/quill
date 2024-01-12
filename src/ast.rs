@@ -28,6 +28,13 @@ pub enum RespectExpr {
 }
 
 #[derive(PartialEq, Eq, Debug, Clone)]
+pub enum OutputExpr {
+    Qiskit, 
+    QASM, 
+    QIR
+}
+
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub enum GateType {
     Q1Gate,
     Q1ParamGate,
@@ -49,9 +56,8 @@ pub enum ASTNode {
         gate: String,
         gate_type: GateType,
         target: Box<ASTNode>, // Name
-        controls: Option<Vec<ASTNode>>, // Vector of Names or QRegSlices
-        // controls only exists for non-single qubit gates
-        params: Option<Vec<ASTNode>>, // Vector of Values (the parameters)
+        controls: Option<Box<ASTNode>>, // ControlList
+        params: Option<Box<ASTNode>>, // ValList
     },
     Measurement {
         measured: Box<ASTNode>, // Name
@@ -59,12 +65,16 @@ pub enum ASTNode {
     },
     Return {
         shots: Box<ASTNode>, // Integer Value
-        output_type: Option<String>, // or should this be a Box(ast node)
+        output_type: Option<String>,
     },
     Name(String),
     QRegSlice {
         name: Box<ASTNode>,
         indices: Vec<i32>, // parse from indices
+    },
+    CRegSlice {
+        name: Box<ASTNode>,
+        indices: Vec<i32>,
     },
     ValList(Vec<ASTNode>), // Simple list of Values
     ControlList(Vec<ASTNode>), // List of Names (Controlled qubits)
@@ -82,6 +92,9 @@ pub enum ASTNode {
     CBit(i32),
     Float(f64),
     Int(i32),
-    PI(f64), // for future ref, f64::consts::PI exists, so when we encounter a PI rule, we can just
-    // parse it on our own and multiply everything out depending on the number of indices
+    Index(i32),
+    PI(f64),
+    OutputType(OutputExpr),
+    EOI,
+    Unimplemented, // THIS IS TEMPORARY!!!
 }

@@ -1,6 +1,6 @@
 Maistow create oo qubit q1 with value +
 Canstow create oo qreg qr1 with value 0[5]
-Maistow create oo cbit c1 with value 1
+Maistow create oo cbit c1 with value b1
 // Maistow create oo int i1 with value 839
 // Maistow create oo float f1 with value 3.14
 Canstow create oo creg cr1 with value 0[5]
