@@ -7,30 +7,27 @@ use crate::ast::{ASTNode, RespectExpr, GateType, OutputExpr};
 #[grammar = "grammar.pest"]
 pub struct QuillParser;
 
-pub fn parse(source: &str) -> Result<Vec<Box<ASTNode>>, Error<Rule>> {
-    let mut ast = vec![];
+pub fn parse(source: &str) -> Result<(Vec<Box<ASTNode>>, f64), Error<Rule>> {
+    let mut ratio: (f64, f64) = (0.0, 0.0);
 
     let pairs = QuillParser::parse(Rule::Program, source)?;
     
-    for pair in pairs {
-        // match pair.as_rule() {
-        //     Rule::Stmt => {
-        //         ast.push(Box::new(build_node(pair).unwrap()));
-        //     },
-        //     _ => {}
-        // }
-        ast.push(Box::new(build_node(pair).unwrap()));
-        // println!("{:?}", pair);
-    }
-    // For future ref, I want to somehow calculate the respect ratio and store it somewhere
-    // we can probably return a tuple?
+    let  ast = pairs.into_iter().map(| pair | {
+        let cloned = pair.clone();
+        if cloned.as_rule() == Rule::AssignStmt {
+            ratio.1 += 1.0;
+            if cloned.into_inner().next().unwrap().as_str() == "Maistow" {
+                ratio.0 += 1.0;
+            }
+        }
+        Box::new(build_node(pair).unwrap())
+    }).collect();
 
-    Ok(ast)
+    Ok((ast, ratio.0 / ratio.1))
 }
 
 fn build_node(pair: pest::iterators::Pair<Rule>) -> Option<ASTNode> {
     match pair.as_rule() {
-        // Rule::Stmt => build_node(pair.into_inner().next()?),
         Rule::AssignStmt => {
             let mut pair = pair.into_inner();
             let respect = match pair.next()?.as_str() {
@@ -81,11 +78,12 @@ fn build_node(pair: pest::iterators::Pair<Rule>) -> Option<ASTNode> {
             let shots = Box::new(build_node(pair.next()?)?); // Int Node
             let mut output_type = None;
             if let Some(next_rule) = pair.next() {
-                output_type = Some(next_rule.as_str().to_string());
+                // output_type = Some(next_rule.as_str().to_string());
+                output_type = build_node(next_rule);
             }
             Some(ASTNode::Return{
                 shots: shots,
-                output_type: output_type,
+                output_type: Some(Box::new(output_type?)),
             })
         },
         Rule::QReg => {
@@ -222,7 +220,7 @@ fn build_node(pair: pest::iterators::Pair<Rule>) -> Option<ASTNode> {
             Some(ASTNode::ValList(control_list))
         },
         Rule::OutputType => {
-            let out_type = match pair.into_inner().as_str() {
+            let out_type = match pair.as_str() {
                 "qir" => OutputExpr::QIR,
                 "qiskit" => OutputExpr::Qiskit,
                 "qasm" => OutputExpr::QASM,
@@ -231,10 +229,7 @@ fn build_node(pair: pest::iterators::Pair<Rule>) -> Option<ASTNode> {
             Some(ASTNode::OutputType(out_type))
         },
         Rule::EOI => Some(ASTNode::EOI),
-        unknown => {
-            println!("currently undefined rule: {:?}", unknown);
-            Some(ASTNode::Unimplemented)
-        },
+        _ => unimplemented!(),
     }
 }
 

@@ -1,6 +1,6 @@
 // Comment Test: Example CNOT program in Quill
-Maistow create oo creg c1 with value 0
-Maistow create oo creg c2 with value 0
+Maistow create oo creg c1 with value b0
+Maistow create oo creg c2 with value b1
 Canstow create oo qubit q1 with value +
 Canstow create oo qubit q2 with value 0
 Thy cnot shalt target q2 and control on q1

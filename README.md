@@ -59,7 +59,7 @@ Return 1024, qir
 _Note_: Variable names cannot start with a number, but otherwise can contain alphanumeric entries.
 
 ### Types and their Values:
-In Quill, we refer to the types in all lowercase, as such: qubit, qreg, cbit, creg, int, float. Below are more details on what values they hold and how to instantiate them.
+In Quill, we refer to the types in all lowercase, as such: qubit, qreg, cbit, creg, int, float. Below are more details on what values they hold and how to instantiate them. Also important to note is that variables can only be (currently) instantiated with types qubit, qreg, cbit, and creg. This is likely to change, but the decision was made to ease through the learning process first (as there is a lot more intricacy involved when you allow free reign with integers and floats by virtue of their usage).
 
 1. Qubit: Can take on the values `0`, `1`, `+`, and `-`, representing the Z and X computational bases.
 2. QReg: Can take on the values `qubit[N]`, where qubit is one of the Qubit values, and N is an integer. An example is `+[3]`. In addition, you can "add" QRegs together during instantiation, which acts as a tensor product. An example of this is `0[4] + +[3] + 1[2]`. In this way, you can instantiate different ranges of a QReg with different values.
@@ -72,6 +72,8 @@ There are some interesting interactions with the `PI` construct, which is native
 1. `PI`: Use this just to get the value of `PI`
 2. `PI[i]`: Use this to get the value of `PI * i`
 3. `PI[i, j]`: Use this to get the value of `PI * (i / j)` 
+
+*Another Note*: Of some importance is the fact that while Ints, Floats, and PI cannot be used in variable declarations, they can be used liberally as parameters for parameterized gates (which is why they are included in the language).
 
 ### Variable Assignment:
 (Canstow / Maistow) create oo `type` `variable_name` with value `value_of_var`
