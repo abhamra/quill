@@ -1,29 +1,23 @@
 use pest::Parser;
 use pest_derive::Parser;
 use pest::error::Error;
-use crate::ast::{ASTNode, RespectExpr, GateType, OutputExpr};
+use crate::ast::{ASTNode, NodeKind, RespectExpr, GateExpr, OutputExpr, ValueExpr};
 
 #[derive(Parser)]
 #[grammar = "grammar.pest"]
 pub struct QuillParser;
 
-pub fn parse(source: &str) -> Result<(Vec<Box<ASTNode>>, f64), Error<Rule>> {
-    let mut ratio: (f64, f64) = (0.0, 0.0);
-
+pub fn parse(source: &str) -> Result<ASTNode, Error<Rule>> {
     let pairs = QuillParser::parse(Rule::Program, source)?;
-    
-    let  ast = pairs.into_iter().map(| pair | {
-        let cloned = pair.clone();
-        if cloned.as_rule() == Rule::AssignStmt {
-            ratio.1 += 1.0;
-            if cloned.into_inner().next().unwrap().as_str() == "Maistow" {
-                ratio.0 += 1.0;
-            }
-        }
-        Box::new(build_node(pair).unwrap())
-    }).collect();
 
-    Ok((ast, ratio.0 / ratio.1))
+    let ast = pairs.into_iter().map(| pair | build_node(pair).unwrap()).collect();
+    
+    let root = ASTNode {
+        children: Some(ast),
+        node_kind: NodeKind::Program,
+    };
+
+    Ok(root)
 }
 
 fn build_node(pair: pest::iterators::Pair<Rule>) -> Option<ASTNode> {
@@ -35,12 +29,22 @@ fn build_node(pair: pest::iterators::Pair<Rule>) -> Option<ASTNode> {
                 "Canstow" => RespectExpr::Canstow,
                 _ => panic!("Unrecognized respect expression!"),
             };
+            let val_type = match pair.next()?.as_str() {
+                "qreg" => ValueExpr::QReg,
+                "qubit" => ValueExpr::Qubit,
+                "creg" => ValueExpr::CReg,
+                "cbit" => ValueExpr::CBit,
+                unknown => panic!("{:?} is not a valid type to assign!", unknown),
+            };
             let name = build_node(pair.next()?)?;
             let value = build_node(pair.next()?)?;
 
-            Some(ASTNode::Assignment{ respect: respect, name: Box::new(name), value: Box::new(value) })
+            let respect_node = ASTNode{ children: None, node_kind: NodeKind::RespectType(respect) };
+            let val_type_node = ASTNode{ children: None, node_kind: NodeKind::ValueType(val_type) };
+            
+            Some(ASTNode{ children: Some(vec![respect_node, val_type_node, name, value]), node_kind: NodeKind::Assignment })
         },
-        Rule::GateStmt => {
+        Rule::GateStmt => { 
             let mut pair = pair.into_inner();
             let gate_type = pair.next()?;
             let target = build_node(pair.next()?)?;
@@ -50,10 +54,10 @@ fn build_node(pair: pest::iterators::Pair<Rule>) -> Option<ASTNode> {
                 if let Some(next_rule) = pair.next() {
                     match next_rule.as_rule() {
                         Rule::ControlList => {
-                            controls = Some(Box::new(build_node(next_rule)?));
+                            controls = Some(build_node(next_rule)?);
                         },
                         Rule::ValList => {
-                            params = Some(Box::new(build_node(next_rule)?));
+                            params = Some(build_node(next_rule)?);
                             break;
                         },
                         _ => panic!("Gate Application Statement does not support {} yet!", next_rule.as_str()),
@@ -68,110 +72,86 @@ fn build_node(pair: pest::iterators::Pair<Rule>) -> Option<ASTNode> {
             let mut pair = pair.into_inner();
             let measured = build_node(pair.next()?)?; // Either Name or QRegSlice
             let recipient = build_node(pair.next()?)?; // Either Name or CRegSlice
-            Some(ASTNode::Measurement {
-                measured: Box::new(measured),
-                recipient: Box::new(recipient),
-            })
+            Some(ASTNode { children: Some(vec![measured, recipient]), node_kind: NodeKind::Measurement })
         },
         Rule::ReturnStmt => {
             let mut pair = pair.into_inner();
-            let shots = Box::new(build_node(pair.next()?)?); // Int Node
+            let shots = build_node(pair.next()?)?; // Int Node
             let mut output_type = None;
             if let Some(next_rule) = pair.next() {
-                // output_type = Some(next_rule.as_str().to_string());
                 output_type = build_node(next_rule);
             }
-            Some(ASTNode::Return{
-                shots: shots,
-                output_type: Some(Box::new(output_type?)),
-            })
+            Some(ASTNode{ children: Some(vec![shots, output_type?]), node_kind: NodeKind::Return })
         },
         Rule::QReg => {
             let mut pair = pair.into_inner();
-            let qubit = Box::new(build_node(pair.next()?)?);
-            let length = pair.next()?.as_str().parse::<i32>()
-                .expect("Your QReg length could not be parsed as an int!");
-            Some(ASTNode::QReg{
-                qubit: qubit,
-                length: length,
-            })
+            let qubit = build_node(pair.next()?)?;
+            let length = build_node(pair.next()?)?; // Should parse to Index node correctly
+
+            Some(ASTNode{ children: Some(vec![qubit, length]), node_kind: NodeKind::QReg })
         },
         Rule::QRegTensor => {
-            let mut pair = pair.into_inner();
-            let mut qregs = vec![];
-            loop {
-                if let Some(next_qreg) = pair.next() {
-                    qregs.push(build_node(next_qreg)?);
-                } else {
-                    break;
-                }
-            }
-            Some(ASTNode::QRegTensor(qregs))
+            let qregs: Vec<ASTNode> = pair.into_inner()
+                .map(| pair | build_node(pair).unwrap()).collect();
+            Some(ASTNode{ children: Some(qregs), node_kind: NodeKind::QRegTensor })
         },
         Rule::QRegSlice => {
             let mut pair = pair.into_inner();
-            let name = Box::new(build_node(pair.next()?)?);
+            let name = build_node(pair.next()?)?;
             let mut indices = vec![];
-            let ind1 = pair.next()?.as_str().parse::<i32>()
-                .expect("Index could not be parsed as an int!");
+            let ind1 = build_node(pair.next()?)?; // Parse to Index
             indices.push(ind1);
             if let Some(next_rule) = pair.next() {
-                indices.push(next_rule.as_str().parse::<i32>()
-                .expect("Index could not be parsed as an int!"));
+                indices.push(build_node(next_rule)?);
             }
-            Some(ASTNode::QRegSlice{
-                name: name,
-                indices: indices,
+            let indices_node = ASTNode{ children: Some(indices), node_kind: NodeKind::Indices };
+            Some(ASTNode{
+                children: Some(vec![name, indices_node]), 
+                node_kind: NodeKind::QRegSlice
             })
         },
         Rule::Qubit => {
-            Some(ASTNode::Qubit(pair.as_str().to_string()))
+            Some(ASTNode{ 
+                children: None,
+                node_kind: NodeKind::Qubit(pair.as_str().to_string()) 
+            })
         },   
         Rule::CReg => {
             let mut pair = pair.into_inner();
-            let cbit = Box::new(build_node(pair.next()?)?);
-            let length = pair.next()?.as_str().parse::<i32>()
-                .expect("Your QReg length could not be parsed as an int!");
-            Some(ASTNode::CReg {
-                cbit: cbit,
-                length: length,
-            })
+            let cbit = build_node(pair.next()?)?;
+            let length = build_node(pair.next()?)?;
+            Some(ASTNode{ children: Some(vec![cbit, length]), node_kind: NodeKind::CReg })
         },
         Rule::CRegTensor => {
-            let mut pair = pair.into_inner();
-            let mut cregs = vec![];
-            loop {
-                if let Some(next_creg) = pair.next() {
-                    cregs.push(build_node(next_creg)?);
-                } else {
-                    break;
-                }
-            }
-            Some(ASTNode::CRegTensor(cregs))
+            let cregs: Vec<ASTNode> = pair.into_inner()
+                .map(| pair | build_node(pair).unwrap()).collect();
+            Some(ASTNode{ children: Some(cregs), node_kind: NodeKind::CReg })
         },
         Rule::CRegSlice => {
             let mut pair = pair.into_inner();
-            let name = Box::new(build_node(pair.next()?)?);
+            let name = build_node(pair.next()?)?;
             let mut indices = vec![];
-            let ind1 = pair.next()?.as_str().parse::<i32>()
-                .expect("Index could not be parsed as an int!");
+            let ind1 = build_node(pair.next()?)?;
             indices.push(ind1);
             if let Some(next_rule) = pair.next() {
-                indices.push(next_rule.as_str().parse::<i32>()
-                .expect("Index could not be parsed as an int!"));
+                indices.push(build_node(next_rule)?);
             }
-            Some(ASTNode::CRegSlice{
-                name: name,
-                indices: indices,
+            let indices_node = ASTNode{ children: Some(indices), node_kind: NodeKind::Indices };
+            Some(ASTNode{ 
+                children: Some(vec![name, indices_node]),
+                node_kind: NodeKind::CRegSlice,
             })
         },
         Rule::CBit => {
             let cbit = (pair.as_str().as_bytes()[1] as char).to_digit(10).unwrap();
-            Some(ASTNode::CBit(cbit.try_into().unwrap()))
+            Some(ASTNode{ 
+                children: None,
+                node_kind: NodeKind::CBit(cbit.try_into().unwrap())
+            })
         },
         Rule::Index => {
             let index = pair.as_str().parse::<i32>().ok()?;
-            Some(ASTNode::Index(index))
+            Some(ASTNode{ children: None, node_kind: NodeKind::Index(index) })
         },
         Rule::Int => {
             let int_str = pair.as_str();
@@ -180,7 +160,7 @@ fn build_node(pair: pest::iterators::Pair<Rule>) -> Option<ASTNode> {
                 _   => (1, int_str),
             };
             let final_val:i32 = val.parse().unwrap();
-            Some(ASTNode::Int(sign * final_val))
+            Some(ASTNode{ children: None, node_kind: NodeKind::Int(sign * final_val) })
         },
         Rule::Float => {
             let float_str = pair.as_str();
@@ -189,7 +169,10 @@ fn build_node(pair: pest::iterators::Pair<Rule>) -> Option<ASTNode> {
                 _   => (1, float_str),
             };
             let final_val:f64 = val.parse().unwrap();
-            Some(ASTNode::Float((sign as f64) * final_val))
+            Some(ASTNode{
+                children: None,
+                node_kind: NodeKind::Float((sign as f64) * final_val),
+            })
         },
         Rule::PI => {
             let mut pair = pair.into_inner();
@@ -200,24 +183,18 @@ fn build_node(pair: pest::iterators::Pair<Rule>) -> Option<ASTNode> {
                     pi_mult /= second_rule.as_str().parse::<f64>().ok()?;
                 }
             }
-            Some(ASTNode::PI(pi_mult))
+            Some(ASTNode{ children: None, node_kind: NodeKind::PI(pi_mult) })
         },
         Rule::Name => {
-            Some(ASTNode::Name(pair.as_str().to_string()))
+            Some(ASTNode{ children: None, node_kind: NodeKind::Name(pair.as_str().to_string()) })
         },
         Rule::ValList => {
-            let mut val_list = vec![];
-            for pair in pair.into_inner() {
-                val_list.push(build_node(pair)?);
-            }
-            Some(ASTNode::ValList(val_list))
+            let val_list = pair.into_inner().map(| pair | build_node(pair).unwrap()).collect();
+            Some(ASTNode{ children: Some(val_list), node_kind: NodeKind::ValList })
         },
         Rule::ControlList => {
-            let mut control_list = vec![];
-            for pair in pair.into_inner() {
-                control_list.push(build_node(pair)?);
-            }
-            Some(ASTNode::ValList(control_list))
+            let control_list = pair.into_inner().map(| pair | build_node(pair).unwrap()).collect();
+            Some(ASTNode{ children: Some(control_list), node_kind: NodeKind::ControlList })
         },
         Rule::OutputType => {
             let out_type = match pair.as_str() {
@@ -226,30 +203,38 @@ fn build_node(pair: pest::iterators::Pair<Rule>) -> Option<ASTNode> {
                 "qasm" => OutputExpr::QASM,
                 &_ => panic!("Unknown output type found!"),
             };
-            Some(ASTNode::OutputType(out_type))
+            Some(ASTNode{ children: None, node_kind: NodeKind::OutputType(out_type) })
         },
-        Rule::EOI => Some(ASTNode::EOI),
+        Rule::EOI => Some(ASTNode{ children: None, node_kind: NodeKind::EOI }),
         _ => unimplemented!(),
     }
 }
 
 // Helper functions for creating all of the different ASTNodes
-fn build_gate_app(gate_rule: pest::iterators::Pair<Rule>, target: ASTNode, controls: Option<Box<ASTNode>>, params: Option<Box<ASTNode>>) -> Option<ASTNode> {
+fn build_gate_app(gate_rule: pest::iterators::Pair<Rule>, target: ASTNode, controls: Option<ASTNode>, params: Option<ASTNode>) -> Option<ASTNode> {
     let gate_type = match gate_rule.clone().as_rule() {
-        Rule::Q1Gate => GateType::Q1Gate,
-        Rule::Q1ParamGate => GateType::Q1ParamGate,
-        Rule::Q2Gate => GateType::Q2Gate,
-        Rule::Q2ParamGate => GateType::Q2ParamGate,
-        Rule::QMultiGate => GateType::QMultiGate,
+        Rule::Q1Gate => GateExpr::Q1Gate,
+        Rule::Q1ParamGate => GateExpr::Q1ParamGate,
+        Rule::Q2Gate => GateExpr::Q2Gate,
+        Rule::Q2ParamGate => GateExpr::Q2ParamGate,
+        Rule::QMultiGate => GateExpr::QMultiGate,
         unknown => panic!("Unknown gate type given: {:?}", unknown),
     };
-    let gate = String::from(gate_rule.as_str());
 
-    Some(ASTNode::GateApplication { 
-        gate: gate,
-        gate_type: gate_type,
-        target: Box::new(target),
-        controls: controls,
-        params: params,
+    let gate_type_node = ASTNode{ children: None, node_kind: NodeKind::GateType(gate_type) };
+
+    let gate = ASTNode{ children: None, node_kind: NodeKind::Name(gate_rule.as_str().to_string()) };
+    
+    let mut children = vec![gate, gate_type_node, target];
+    if let Some(cont) = controls {
+        children.push(cont);
+    }
+    if let Some(pars) = params {
+        children.push(pars);
+    }
+
+    Some(ASTNode{
+        children: Some(children),
+        node_kind: NodeKind::GateApplication,
     })
 }

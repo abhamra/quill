@@ -63,7 +63,7 @@ ReturnStmt = { "Return " ~ Int ~ (", " ~ OutputType)? }
 OutputType = { ("qir" | "qasm" | "qiskit") }
 
 // All currently supported types in Quill
-Type = _{  "qubit" 
+Type = {  "qubit" 
 		| "qreg" 
         | "cbit" 
         | "creg" }
@@ -92,7 +92,7 @@ CBitTarget = _{ (CRegSlice | Name) }
 // The QReg value, largely for instantiation purposes. The QRegSlice is
 // more commonly used for accessing individual qubits or a range of qubits
 // for gate applications
-QReg = { (Qubit ~ "[" ~ (Index) ~ "]") } //  ~ (" + " ~ QReg)?
+QReg = { (Qubit ~ "[" ~ (Index) ~ "]") }
 QRegTensor = { QReg ~ (" + " ~ QReg)+ }
 QRegSlice = { (Name ~ "[" ~ Index ~ ".." ~ Index ~ "]") | (Name ~ "[" ~ Index ~ "]") }
 

@@ -1,4 +1,4 @@
-#[derive(PartialEq, Eq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub enum RespectExpr {
     Canstow,
     Maistow,
@@ -12,7 +12,7 @@ pub enum OutputExpr {
 }
 
 #[derive(PartialEq, Eq, Debug, Clone)]
-pub enum GateType {
+pub enum GateExpr {
     Q1Gate,
     Q1ParamGate,
     Q2Gate,
@@ -21,55 +21,67 @@ pub enum GateType {
     QMultiGate,
 }
 
+#[derive(PartialEq, Eq, Debug, Clone)]
+pub enum ValueExpr {
+    QReg,
+    Qubit,
+    CBit,
+    CReg,
+}
+
 #[derive(PartialEq, Debug, Clone)]
-pub enum ASTNode { 
-    Assignment {
-        respect: RespectExpr,
-        name: Box<ASTNode>, // Name
-        value: Box<ASTNode> // One of the value nodes
-    }, 
-    GateApplication {
-        gate: String,
-        gate_type: GateType,
-        target: Box<ASTNode>, // Name
-        controls: Option<Box<ASTNode>>, // ControlList
-        params: Option<Box<ASTNode>>, // ValList
-    },
-    Measurement {
-        measured: Box<ASTNode>, // Name
-        recipient: Box<ASTNode>, // Name
-    },
-    Return {
-        shots: Box<ASTNode>, // Integer Value
-        output_type: Option<Box<ASTNode>>, // OutputType
-    },
+pub enum NodeKind { // Question: Do we want to add data / fields to the NodeKind enum variants?
+    Program,
+    Assignment,
+    GateApplication,
+    Measurement,
+    Return,
     Name(String),
-    QRegSlice {
-        name: Box<ASTNode>,
-        indices: Vec<i32>, // parse from indices
-    },
-    CRegSlice {
-        name: Box<ASTNode>,
-        indices: Vec<i32>,
-    },
-    ValList(Vec<ASTNode>), // Simple list of Values
-    ControlList(Vec<ASTNode>), // List of Names (Controlled qubits)
-    QRegTensor(Vec<ASTNode>), // Vec of QRegs
-    QReg {
-        qubit: Box<ASTNode>, // Qubit
-        length: i32, // Index
-    },
-    Qubit(String), // fixing
-    CRegTensor(Vec<ASTNode>), // Vec of CRegs
-    CReg {
-        cbit: Box<ASTNode>, // CBit
-        length: i32,
-    },
+    Indices, // Indices(Vec<i32>) was alternative, but for now we hold the indices as children
+    QRegSlice,
+    CRegSlice,
+    ValList, // ValList(Vec<ASTNode>) was alternative, for now we hold values as children
+    ControlList,
+    QRegTensor, // Children will be QRegs
+    QReg, // Children will be qubit, Index
+    Qubit(String),
+    CRegTensor,
+    CReg, // Children will be CBit, Index
     CBit(i32),
     Float(f64),
     Int(i32),
     Index(i32),
     PI(f64),
     OutputType(OutputExpr),
+    ValueType(ValueExpr),
+    GateType(GateExpr),
+    RespectType(RespectExpr),
     EOI,
+}
+
+#[derive(PartialEq, Debug, Clone)]
+pub struct ASTNode {
+    pub children: Option<Vec<ASTNode>>,
+    pub node_kind: NodeKind,
+}
+
+// TODO: Create a "new" function, and functionalize some code in parser (the ones that parse lists
+// of objects are suitable targets for this)
+// Also, (potentially) create functions to modify children and node_kind, so that the fields don't
+// have to be public (for safety, use accessors and mutator methods)
+
+impl ASTNode {
+    pub fn new(children: Option<Vec<ASTNode>>, node_kind: NodeKind) -> ASTNode {
+        ASTNode { children: children, node_kind: node_kind }
+    }
+
+    pub fn print_nodes(node: &ASTNode, depth: usize) {
+        println!("{}{:?}", String::from("    ").repeat(depth),
+                node.node_kind);
+        for child in &node.children {
+            for c in child {
+                ASTNode::print_nodes(&c, depth + 1)
+            }
+        }
+    }   
 }
