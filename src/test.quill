@@ -7,4 +7,4 @@ Thy cnot shalt target q2 and control on q1
 Thy rxx shalt target q1 and control on q2 with [PI]
 Rede q1 and quyken c1
 Rede q2 and quyken c2
-Return 1024, qir
+Return 1024

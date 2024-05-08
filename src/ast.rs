@@ -5,13 +5,6 @@ pub enum RespectExpr {
 }
 
 #[derive(PartialEq, Eq, Debug, Clone)]
-pub enum OutputExpr {
-    Qiskit, 
-    QASM, 
-    QIR
-}
-
-#[derive(PartialEq, Eq, Debug, Clone)]
 pub enum GateExpr {
     Q1Gate,
     Q1ParamGate,
@@ -30,7 +23,8 @@ pub enum ValueExpr {
 }
 
 #[derive(PartialEq, Debug, Clone)]
-pub enum NodeKind { // Question: Do we want to add data / fields to the NodeKind enum variants?
+pub enum NodeKind {
+    // Question: Do we want to add data / fields to the NodeKind enum variants?
     Program,
     Assignment,
     GateApplication,
@@ -43,7 +37,7 @@ pub enum NodeKind { // Question: Do we want to add data / fields to the NodeKind
     ValList, // ValList(Vec<ASTNode>) was alternative, for now we hold values as children
     ControlList,
     QRegTensor, // Children will be QRegs
-    QReg, // Children will be qubit, Index
+    QReg,       // Children will be qubit, Index
     Qubit(String),
     CRegTensor,
     CReg, // Children will be CBit, Index
@@ -52,7 +46,6 @@ pub enum NodeKind { // Question: Do we want to add data / fields to the NodeKind
     Int(i32),
     Index(i32),
     PI(f64),
-    OutputType(OutputExpr),
     ValueType(ValueExpr),
     GateType(GateExpr),
     RespectType(RespectExpr),
@@ -72,16 +65,18 @@ pub struct ASTNode {
 
 impl ASTNode {
     pub fn new(children: Option<Vec<ASTNode>>, node_kind: NodeKind) -> ASTNode {
-        ASTNode { children: children, node_kind: node_kind }
+        ASTNode {
+            children: children,
+            node_kind: node_kind,
+        }
     }
 
     pub fn print_nodes(node: &ASTNode, depth: usize) {
-        println!("{}{:?}", String::from("    ").repeat(depth),
-                node.node_kind);
+        println!("{}{:?}", String::from("    ").repeat(depth), node.node_kind);
         for child in &node.children {
             for c in child {
                 ASTNode::print_nodes(&c, depth + 1)
             }
         }
-    }   
+    }
 }

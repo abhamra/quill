@@ -59,8 +59,7 @@ QMultiGate = { "mcx"
 MeasureStmt = { "Rede " ~ QubitTarget ~ " and quyken " ~ CBitTarget }
 
 // Return Statement
-ReturnStmt = { "Return " ~ Int ~ (", " ~ OutputType)? }
-OutputType = { ("qir" | "qasm" | "qiskit") }
+ReturnStmt = { "Return " ~ Int }
 
 // All currently supported types in Quill
 Type = {  "qubit" 

@@ -1,7 +1,7 @@
 /// Define optimization passes + pass to check number of Maistow's vs All Assignments for ratio
 /// calculation
 
-use crate::ast::{ASTNode, RespectExpr, GateExpr, OutputExpr, NodeKind};
+use crate::ast::{ASTNode, RespectExpr, GateExpr, NodeKind};
 
 // This function calculates whether the correct ratio of
 // (change back to doc comment when fixed)
