@@ -12,6 +12,7 @@ fn main() {
     let ast = parse(&raw_file).expect("failed parse");
     // println!("{:?} \n -- \n", ast);
 
+    // NOTE: The threshold is to check if we use the optimizations!
     let threshold_passed = respect_ratio(&ast);
     println!("{}", threshold_passed);
 

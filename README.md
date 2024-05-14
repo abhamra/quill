@@ -40,6 +40,8 @@ On the docket for (potential) future additions to Quill are:
 - If/elif/else statements
 - For and While loops
 - More potentially painful and perilous syntax (beware)
+- Fixing Index bounds checking for QRegs!
+- Fixing error messages to account for comments!
 
 ## Examples
 Below is a simple example of creating a Bell State using Quill:

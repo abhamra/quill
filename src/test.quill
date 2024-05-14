@@ -3,9 +3,11 @@ Maistow create oo cbit c1 with value b0
 Maistow create oo cbit c2 with value b1
 Canstow create oo qubit q1 with value +
 Canstow create oo qubit q2 with value 0
+// Canstow create oo qubit q3 with value -
 Thy x shalt target q1
 Thy cnot shalt target q2 and control on q1
 Thy rxx shalt target q1 with [PI]
+// Thy mcx shalt target q1 and control on q2, q3
 Rede q1 and quyken c1
 Rede q2 and quyken c2
 Return 1024

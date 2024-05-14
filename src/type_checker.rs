@@ -1,7 +1,6 @@
 //! Basic type checker for verifying validity of Quill programs
-
 use crate::ast::{ASTNode, GateExpr, NodeKind, ValueExpr};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// This function is for type checking the AST, making sure that
 /// all of the statements are valid, typing wise
@@ -12,7 +11,6 @@ pub fn type_check(ast: &ASTNode) {
     // Check to see if Return is the second last child
     let children = ast.children.as_ref().unwrap();
     for i in 0..(children.len() - 1) {
-        // children.len() - 1 to ignore EOI
         if children[i].node_kind == NodeKind::Return && i != (children.len() - 2) {
             panic!(
                 "Return expected on line {}, found at line {} instead!",
@@ -22,26 +20,16 @@ pub fn type_check(ast: &ASTNode) {
         }
     }
 
+    // TODO: (This section of the code will be done at a later date)
     // What I need to check for:
-    // - If a variable of a given type was instantiated with that type correctly
-    // - If there is an assignment of an existing variable name, make sure the old type is adhered
-    // to
-    // - If gate expressions have gates being applied correctly
-    // - If gate expressions apply a gate to a given qubit, make sure it exists
     // - If gate expressions apply a gate to a qreg, make sure the slice exists
     //   (This can include a single index -> if out of bounds, bad, or it can
     //   also include having a range and the range not being valid)
-    // - If gate expressions apply to a given qubit, make sure there are no duplicate names
     // - If gate expressions apply to a given qreg, make sure the slices do not overlap at all
     // - For multicontrol gates, make sure the slices are limited to one single instance of the
     //   qreg and not multiple qubits across the qreg
     // - For the measurement expressions, check that the number of qubits measured and number of
     // cbits measured matches up
-    // - If a return statement is caught but is not the last line of the program, throw an
-    // error
-    // - Make sure that for all nodes, they have the correct amount of children (if they have any
-    // at all, also check that) for example, EOI shouldnt have children
-    // let len = ast.children.as_ref().unwrap().len();
     let mut line_no = 0;
     for node in ast.children.as_ref().unwrap() {
         match &node.node_kind {
@@ -168,6 +156,8 @@ pub fn type_check(ast: &ASTNode) {
                                 );
                                 // TODO: Check that control is a defined qubit and not a duplicate
                                 // (make function)
+                                verify_target(&controls[0], &ctx, line_no); /* Can repeat for QMultiGate */
+                                control_validity(&children[2], controls, line_no);
                             } else {
                                 panic!("{}: Q2 gates require controls list, but no list of controlled qubits was found!", line_no);
                             }
@@ -177,7 +167,7 @@ pub fn type_check(ast: &ASTNode) {
                             if let Some(pars) = &children[3].children {
                                 assert!(
                                     pars.len() == 1,
-                                    "{}", format!("{}: More than one parameter for single qubit parameterized gate!", line_no)
+                                    "{}", format!("{}: More than one parameter for double qubit parameterized gate!", line_no)
                                 );
                                 // DONE: Continue checks by making sure the parameter is defined
                                 // correctly (Has to be PI, Float, Int for params, make this check
@@ -191,53 +181,29 @@ pub fn type_check(ast: &ASTNode) {
                             }
                         }
                         GateExpr::QMultiGate => {
-                            println!("Found QMultiGate!");
+                            /*Q2 gates are cx, cz for now, so they require controls, not params*/
+                            if let Some(controls) = &children[3].children {
+                                // TODO: Check that control is a defined qubit and not a duplicate
+                                // (make function)
+                                // NOTE: REPEAT FOR QMULTI
+                                for control in controls {
+                                    verify_target(control, &ctx, line_no);
+                                }
+                                control_validity(&children[2], controls, line_no);
+                            } else {
+                                panic!("{}: QMulti gates require controls list, but no list of controlled qubits was found!", line_no);
+                            }
                         }
-                        _ => {}
+                        _ => unreachable!(),
                     }
                 }
             }
             NodeKind::Measurement => {
+                line_no += 1;
                 // [measured (Name/QRegSlice), recipient (Name/CRegSlice)]
                 let children = node.children.as_ref().unwrap();
-
                 // Measured Qubit / QRegSlice
-                match &children[0].node_kind {
-                    NodeKind::Name(nam) => {
-                        // Qubit Case, verify name is a qubit
-                        if let Some(val) = ctx.get(nam) {
-                            match *val {
-                                ValueExpr::Qubit => {}
-                                _ => panic!("Qubit expected, {:?} given!", val.clone()),
-                            }
-                        } else {
-                            panic!("Unknown variable {:?} given, not a qubit!", nam.clone());
-                        }
-                    }
-                    NodeKind::QRegSlice => {
-                        let qreg_children = &children[0].children.as_ref().unwrap();
-                        match &qreg_children[0].node_kind {
-                            NodeKind::Name(nam) => {
-                                // QReg Case, verify name is a QReg
-                                if let Some(val) = ctx.get(nam) {
-                                    match *val {
-                                        ValueExpr::QReg => {
-                                            // TODO: Check index validity
-                                        }
-                                        _ => panic!("CReg expected, {:?} given!", val.clone()),
-                                    }
-                                } else {
-                                    panic!(
-                                        "Unknown variable {:?} given, not a qubit!",
-                                        nam.clone()
-                                    );
-                                }
-                            }
-                            _ => {}
-                        }
-                    }
-                    _ => {}
-                } // end of match
+                verify_target(&children[0], &ctx, line_no);
 
                 // Recipient CBit / CRegSlice
                 match &children[1].node_kind {
@@ -278,6 +244,7 @@ pub fn type_check(ast: &ASTNode) {
                 }
             }
             NodeKind::Return => {
+                line_no += 1;
                 // [shots]
                 // Verify if integer is non-negative
                 let children = node.children.as_ref().unwrap();
@@ -294,7 +261,7 @@ pub fn type_check(ast: &ASTNode) {
                 }
             }
             NodeKind::EOI => {} // Intentionally do nothing here, nothing to handle
-            unknown => panic!("{:?} is not a valid top-level node!", unknown),
+            _ => unreachable!(),
         }
     }
 }
@@ -315,7 +282,7 @@ fn assignment_helper(typ: &ValueExpr, value: &ASTNode) -> ValueExpr {
     value_typ
 }
 
-// fn control_validity()
+// Goal of this function is to make sure that the target node is a valid Qubit or QReg
 fn verify_target(target: &ASTNode, ctx: &HashMap<String, ValueExpr>, line_no: i32) {
     match &target.node_kind {
         NodeKind::Name(nam) => {
@@ -336,13 +303,15 @@ fn verify_target(target: &ASTNode, ctx: &HashMap<String, ValueExpr>, line_no: i3
         NodeKind::QRegSlice => {
             let qreg_children = target.children.as_ref().unwrap();
             match &qreg_children[0].node_kind {
-                /*TODO: Should probably be an if let*/
                 NodeKind::Name(nam) => {
                     // QReg Case, verify name is a QReg
                     if let Some(val) = ctx.get(nam) {
                         match *val {
                             ValueExpr::QReg => {
-                                // TODO: Check index validity
+                                // TODO: Check index validity (need to reimplement hashing, add
+                                // separate hash for storing indices for QRegs during assignment,
+                                // to cross reference during gate application)
+                                // let indices = &qreg_children[1].children.as_ref().unwrap();
                             }
                             _ => panic!("{}: QReg expected, {:?} given!", line_no, val.clone()),
                         }
@@ -360,3 +329,43 @@ fn verify_target(target: &ASTNode, ctx: &HashMap<String, ValueExpr>, line_no: i3
         _ => unreachable!(),
     }
 }
+
+// Goal of this function is to make sure there are no duplicates amongst the target and all the
+// controls.
+fn control_validity(target: &ASTNode, controls: &Vec<ASTNode>, line_no: i32) {
+    let target_name = get_name_from_node(target);
+    let mut control_ids: Vec<&str> = vec![];
+    for qubit in controls {
+        let qubit_name = get_name_from_node(qubit);
+        control_ids.push(qubit_name);
+        if target_name == qubit_name {
+            panic!("{}: Controlled gates cannot control on the same qubit, but target equalled controlled!", line_no);
+        }
+    }
+    assert_eq!(
+        control_ids.len(),
+        HashSet::<&str>::from_iter(control_ids.clone()).len(),
+        "{}",
+        format!(
+            "{}: There was a duplicate amongst the control qubits: {:?}",
+            line_no, control_ids
+        ),
+    );
+}
+
+fn get_name_from_node(node: &ASTNode) -> &str {
+    match &node.node_kind {
+        NodeKind::Name(nam) => nam,
+        NodeKind::QRegSlice => {
+            let qreg_children = node.children.as_ref().unwrap();
+            match &qreg_children[0].node_kind {
+                NodeKind::Name(nam) => nam,
+                _ => unreachable!(),
+            }
+        }
+        _ => unreachable!(),
+    }
+}
+
+// TODO: This
+// fn check_index_validity()
