@@ -123,5 +123,5 @@ CRegSlice = { (Name ~ "[" ~ Index ~ ".." ~ Index ~ "]") | (Name ~ "[" ~ Index ~ 
 Name = { ASCII_ALPHA ~ ASCII_ALPHANUMERIC* }
 
 // Comment (self-explanatory)
-COMMENT = _{ "//" ~ (!NEWLINE ~ ANY)* ~ NEWLINE+ }
+COMMENT = { "//" ~ (!NEWLINE ~ ANY)* ~ NEWLINE+ }
 

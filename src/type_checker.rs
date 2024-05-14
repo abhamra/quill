@@ -260,6 +260,7 @@ pub fn type_check(ast: &ASTNode) {
                     _ => panic!("Node is not of type int, unexpected in return statement!"),
                 }
             }
+            NodeKind::COMMENT => line_no += 1,
             NodeKind::EOI => {} // Intentionally do nothing here, nothing to handle
             _ => unreachable!(),
         }

@@ -260,6 +260,10 @@ fn build_node(pair: pest::iterators::Pair<Rule>) -> Option<ASTNode> {
             children: None,
             node_kind: NodeKind::EOI,
         }),
+        Rule::COMMENT => Some(ASTNode {
+            children: None,
+            node_kind: NodeKind::COMMENT,
+        }),
         _ => unimplemented!(),
     }
 }

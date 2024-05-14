@@ -49,6 +49,7 @@ pub enum NodeKind {
     ValueType(ValueExpr),
     GateType(GateExpr),
     RespectType(RespectExpr),
+    COMMENT,
     EOI,
 }
 
