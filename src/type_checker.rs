@@ -1,6 +1,6 @@
 //! Basic type checker for verifying validity of Quill programs
 
-use crate::ast::{ASTNode, NodeKind, ValueExpr};
+use crate::ast::{ASTNode, GateExpr, NodeKind, ValueExpr};
 use std::collections::HashMap;
 
 /// This function is for type checking the AST, making sure that
@@ -42,12 +42,13 @@ pub fn type_check(ast: &ASTNode) {
     // - Make sure that for all nodes, they have the correct amount of children (if they have any
     // at all, also check that) for example, EOI shouldnt have children
     // let len = ast.children.as_ref().unwrap().len();
-
+    let mut line_no = 0;
     for node in ast.children.as_ref().unwrap() {
         match &node.node_kind {
             NodeKind::Assignment => {
+                line_no += 1;
                 let children = node.children.as_ref().unwrap();
-                assert_eq!(children.len(), 4, "Your assignment node somehow didn't have the requisite number of elements!\nShame on thee!");
+                assert_eq!(children.len(), 4, "{}: Your assignment node somehow didn't have the requisite number of elements!\nShame on thee!", line_no);
                 let val_type = &children[1];
                 let name = match &children[2].node_kind {
                     NodeKind::Name(nam) => nam,
@@ -57,7 +58,10 @@ pub fn type_check(ast: &ASTNode) {
 
                 let val_expr = match &val_type.node_kind {
                     NodeKind::ValueType(typ) => assignment_helper(typ, &value),
-                    _ => panic!("The ValueType node should have AST NodeKind ValueType!"),
+                    _ => panic!(
+                        "{}: The ValueType node should have AST NodeKind ValueType!",
+                        line_no
+                    ),
                 };
                 // Use the return value of insert to check and see if there was a previous entry
                 // with the same name, and then verify types!
@@ -65,7 +69,8 @@ pub fn type_check(ast: &ASTNode) {
                 if let Some(prev) = old_val {
                     if prev != val_expr {
                         panic!(
-                            "{:?} was originally of type {:?}, but now given type {:?}!",
+                            "{}: {:?} was originally of type {:?}, but now given type {:?}!",
+                            line_no,
                             *name,
                             prev,
                             val_expr.clone()
@@ -74,63 +79,123 @@ pub fn type_check(ast: &ASTNode) {
                 }
             }
             NodeKind::GateApplication => {
+                line_no += 1;
                 let children = node.children.as_ref().unwrap();
                 // [gate, gate_type_node, target, controls, params] (Always controls first)
                 // controls and params are optional
 
                 // Check name of target, verify that it's qubit or single qreg slice
                 // OR, if is multi qreg slice, then the gate is a single qubit gate of some form
-
-                match &children[2].node_kind {
-                    NodeKind::Name(nam) => {
-                        // Qubit Case, verify name is a qubit
-                        if let Some(val) = ctx.get(nam) {
-                            match *val {
-                                ValueExpr::Qubit => {}
-                                _ => panic!("Qubit expected, {:?} given!", val.clone()),
-                            }
-                        } else {
-                            panic!("Unknown variable {:?} given, not a qubit!", nam.clone());
-                        }
-                    }
-                    NodeKind::QRegSlice => {
-                        let qreg_children = &children[2].children.as_ref().unwrap();
-                        println!("{:?}", qreg_children); // [name, indices_node]
-                        match &qreg_children[0].node_kind {
-                            NodeKind::Name(nam) => {
-                                // QReg Case, verify name is a QReg
-                                if let Some(val) = ctx.get(nam) {
-                                    match *val {
-                                        ValueExpr::QReg => {
-                                            // TODO: Check index validity
-                                        }
-                                        _ => panic!("Qubit expected, {:?} given!", val.clone()),
-                                    }
-                                } else {
-                                    panic!(
-                                        "Unknown variable {:?} given, not a qubit!",
-                                        nam.clone()
-                                    );
-                                }
-                            }
-                            _ => unreachable!(),
-                        }
-                    }
-                    _ => unreachable!(),
-                }
+                verify_target(&children[2], &ctx, line_no);
+                // match &children[2].node_kind {
+                //     NodeKind::Name(nam) => {
+                //         // Qubit Case, verify name is a qubit
+                //         if let Some(val) = ctx.get(nam) {
+                //             match *val {
+                //                 ValueExpr::Qubit => {}
+                //                 _ => panic!("Qubit expected, {:?} given!", val.clone()),
+                //             }
+                //         } else {
+                //             panic!("Unknown variable {:?} given, not a qubit!", nam.clone());
+                //         }
+                //     }
+                //     NodeKind::QRegSlice => {
+                //         let qreg_children = &children[2].children.as_ref().unwrap();
+                //         match &qreg_children[0].node_kind {
+                //             /*TODO: Should probably be an if let*/
+                //             NodeKind::Name(nam) => {
+                //                 // QReg Case, verify name is a QReg
+                //                 if let Some(val) = ctx.get(nam) {
+                //                     match *val {
+                //                         ValueExpr::QReg => {
+                //                             // TODO: Check index validity
+                //                         }
+                //                         _ => panic!("QReg expected, {:?} given!", val.clone()),
+                //                     }
+                //                 } else {
+                //                     panic!("Unknown variable {:?} given, not a qreg!", nam.clone());
+                //                 }
+                //             }
+                //             _ => unreachable!(),
+                //         }
+                //     }
+                //     _ => unreachable!(),
+                // }
 
                 // actually do the type checking for the
-                // [gate, gate_type_node, target, controls, params] (Always controls first)
-                match children.len() {
-                    3 => {}
-                    4 => {}
-                    5 => {}
-                    _ => unreachable!(),
+                // [gate, gate_type_node, target, controls, params] (Always controls first) (match against gate_type_node for what to expect)
+                // NOTE: this if let is kind of redundant, but "easy" for now
+                // note that gates, as talked about below, will always be vacuously
+                // correct. Below, we destructure the vector manually because it
+                // isn't cool like tuples.
+                let gate_node_kind = &children[1].node_kind;
+                // let controls = &children[3]; // Option
+                // let params = &children[4]; // Option
+                if let NodeKind::GateType(gate_expr) = gate_node_kind {
+                    match gate_expr {
+                        GateExpr::Q1Gate => {
+                            /*children.len() = 3, no cont, params
+                             * we have already checked for target's validity
+                             * and because of pest parsing, the gate name will
+                             * be a correct subset of the gate_type_node's
+                             * category (e.g. 'h' will necessarily be of
+                             * type Q1Gate. Hence, we do nothing here!*/
+                        }
+                        GateExpr::Q1ParamGate => {
+                            /*Requires params list, so check for params.len() == 1*/
+                            if let Some(pars) = &children[3].children {
+                                assert!(
+                                    pars.len() == 1,
+                                    "{}", format!("{}: More than one parameter for single qubit parameterized gate!", line_no)
+                                );
+                                // DONE: Continue checks by making sure the parameter is defined
+                                // correctly (Has to be PI, Float, Int for params, make this check
+                                // a function?)
+                                match &pars[0].node_kind {
+                                    NodeKind::PI(_) | NodeKind::Float(_) | NodeKind::Int(_) => {},
+                                    other => panic!("{}: Parameters should be of type PI, Float, or Int, found {:?} instead!", line_no, other),
+                                }
+                            } else {
+                                panic!("{}: No parameters for Q1 Param Gate!", line_no);
+                            }
+                        }
+                        GateExpr::Q2Gate => {
+                            /*Q2 gates are cx, cz for now, so they require controls, not params*/
+                            if let Some(controls) = &children[3].children {
+                                assert!(
+                                    controls.len() == 1,
+                                    "{}", format!("{}: More than one controlled qubit for a double qubit control gate!", line_no)
+                                );
+                                // TODO: Check that control is a defined qubit and not a duplicate
+                                // (make function)
+                            } else {
+                                panic!("{}: Q2 gates require controls list, but no list of controlled qubits was found!", line_no);
+                            }
+                        }
+                        GateExpr::Q2ParamGate => {
+                            /*Requires params list, so check for params.len() == 1*/
+                            if let Some(pars) = &children[3].children {
+                                assert!(
+                                    pars.len() == 1,
+                                    "{}", format!("{}: More than one parameter for single qubit parameterized gate!", line_no)
+                                );
+                                // DONE: Continue checks by making sure the parameter is defined
+                                // correctly (Has to be PI, Float, Int for params, make this check
+                                // a function?)
+                                match &pars[0].node_kind {
+                                    NodeKind::PI(_) | NodeKind::Float(_) | NodeKind::Int(_) => {},
+                                    other => panic!("{}: Parameters should be of type PI, Float, or Int, found {:?} instead!", line_no, other),
+                                }
+                            } else {
+                                panic!("{}: No parameters for Q2 Param Gate!", line_no);
+                            }
+                        }
+                        GateExpr::QMultiGate => {
+                            println!("Found QMultiGate!");
+                        }
+                        _ => {}
+                    }
                 }
-
-                // Note: Make sure to use a match against the length of the children vec,
-                // to see if you have a controls list or params list to care about
-                // Note 2: If there are 3 elts, always a control list (not param list)
             }
             NodeKind::Measurement => {
                 // [measured (Name/QRegSlice), recipient (Name/CRegSlice)]
@@ -168,10 +233,10 @@ pub fn type_check(ast: &ASTNode) {
                                     );
                                 }
                             }
-                            _ => unreachable!(),
+                            _ => {}
                         }
                     }
-                    _ => unreachable!(),
+                    _ => {}
                 } // end of match
 
                 // Recipient CBit / CRegSlice
@@ -206,10 +271,10 @@ pub fn type_check(ast: &ASTNode) {
                                     );
                                 }
                             }
-                            _ => unreachable!(),
+                            _ => {}
                         }
                     }
-                    _ => unreachable!(),
+                    _ => {}
                 }
             }
             NodeKind::Return => {
@@ -248,4 +313,50 @@ fn assignment_helper(typ: &ValueExpr, value: &ASTNode) -> ValueExpr {
 
     assert_eq!(*typ, value_typ);
     value_typ
+}
+
+// fn control_validity()
+fn verify_target(target: &ASTNode, ctx: &HashMap<String, ValueExpr>, line_no: i32) {
+    match &target.node_kind {
+        NodeKind::Name(nam) => {
+            // Qubit Case, verify name is a qubit
+            if let Some(val) = ctx.get(nam) {
+                match *val {
+                    ValueExpr::Qubit => {}
+                    _ => panic!("{}: Qubit expected, {:?} given!", line_no, val.clone()),
+                }
+            } else {
+                panic!(
+                    "{}: Unknown variable {:?} given, not a qubit!",
+                    line_no,
+                    nam.clone()
+                );
+            }
+        }
+        NodeKind::QRegSlice => {
+            let qreg_children = target.children.as_ref().unwrap();
+            match &qreg_children[0].node_kind {
+                /*TODO: Should probably be an if let*/
+                NodeKind::Name(nam) => {
+                    // QReg Case, verify name is a QReg
+                    if let Some(val) = ctx.get(nam) {
+                        match *val {
+                            ValueExpr::QReg => {
+                                // TODO: Check index validity
+                            }
+                            _ => panic!("{}: QReg expected, {:?} given!", line_no, val.clone()),
+                        }
+                    } else {
+                        panic!(
+                            "{}: Unknown variable {:?} given, not a qreg!",
+                            line_no,
+                            nam.clone()
+                        );
+                    }
+                }
+                _ => unreachable!(),
+            }
+        }
+        _ => unreachable!(),
+    }
 }

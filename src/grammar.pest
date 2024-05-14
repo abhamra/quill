@@ -41,7 +41,7 @@ Q2Gate = { "cnot"
          | "cz" } 
 
 // Double Parameterized Gate Application
-DoubleParamGateStmt = _{ "Thy " ~ Q2ParamGate ~ " shalt target " ~ QubitTarget ~ " and control on " ~ ControlList ~ " with " ~ ValList }
+DoubleParamGateStmt = _{ "Thy " ~ Q2ParamGate ~ " shalt target " ~ QubitTarget ~ " with " ~ ValList }
 Q2ParamGate = { "rxx"
               | "ryy" 
               | "rzz" }
@@ -51,7 +51,7 @@ Q2ParamGate = { "rxx"
 MultiControlGateStmt = _{ "Thy " ~ QMultiGate ~ " shalt target " ~ (QubitTarget | QRegSlice ) ~ " and control on " ~ ControlList }
 
 QMultiGate = { "mcx" 
-			 | "mcy"
+	     | "mcy"
              | "mcz"
              | ("toffoli" | "ccx") }
 

@@ -58,6 +58,30 @@ pub struct ASTNode {
     pub node_kind: NodeKind,
 }
 
+// NOTE: The Rust Compiler uses the below struct to define an expression
+// #[derive(Clone, Encodable, Decodable, Debug)]
+// pub struct Expr {
+//     pub id: NodeId,
+//     pub kind: ExprKind,
+//     pub span: Span,
+//     pub attrs: AttrVec,
+//     pub tokens: Option<LazyAttrTokenStream>,
+// }
+// Followed by an impl block for Expr
+// The ExprKind enum is also important, and is implemented with pointers to
+// expressions like below:
+// #[derive(Clone, Encodable, Decodable, Debug)]
+// pub enum ExprKind {
+//      Binary(BinOp, P<Expr>, P<Expr>)
+//      // NOTE: here, BinOp is an enum, and P is from rustc_ast::ptr::P,
+//  } (this is just an example, it continues for a while)
+//
+//  The implementation of rustc_ast::ptr::P is below, just for clarity (it is
+//  quite literally a wrapper around Box)
+//  pub struct P<T: ?Sized> {
+//     ptr: Box<T>,
+// }
+
 // TODO: Create a "new" function, and functionalize some code in parser (the ones that parse lists
 // of objects are suitable targets for this)
 // Also, (potentially) create functions to modify children and node_kind, so that the fields don't
